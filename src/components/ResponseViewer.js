@@ -1,125 +1,277 @@
 "use client";
-import { useState, memo } from "react";
+import { useState, memo, useCallback } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import {
+  Copy,
+  Download,
+  Search,
+  Check,
+  Sparkles,
+  Maximize2,
+  Minimize2,
+} from "lucide-react";
+import { cn } from "@/lib/utils";
 
 function highlightJSON(json) {
   const text = typeof json === "string" ? json : JSON.stringify(json, null, 2);
-  return text
+  const escaped = text
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"([^"]+)":/g, '<span class="text-[#1976D2] dark:text-[#6fbfff]">"$1"</span>:')
-    .replace(/: "([^"]+)"/g, ': <span class="text-[#2E7D32] dark:text-[#6fbf6f]">"$1"</span>')
-    .replace(/: (-?\d+\.?\d*)/g, ': <span class="text-[#F57C00] dark:text-[#ff9f4f]">$1</span>')
-    .replace(/: (true|false)/g, ': <span class="text-[#C62828] dark:text-[#ff6f6f]">$1</span>')
-    .replace(/: (null)/g, ': <span class="text-[#9a9a9a] dark:text-[#6b6b6b]">$1</span>');
+    .replace(/>/g, "&gt;");
+  return escaped
+    .replace(/"([^"]+)":/g, '<span class="text-blue-600 dark:text-blue-400">"$1"</span>:')
+    .replace(/: "([^"]+)"/g, ': <span class="text-emerald-600 dark:text-emerald-400">"$1"</span>')
+    .replace(/: (-?\d+\.?\d*)/g, ': <span class="text-amber-600 dark:text-amber-400">$1</span>')
+    .replace(/: (true|false)/g, ': <span class="text-purple-600 dark:text-purple-400">$1</span>')
+    .replace(/: (null)/g, ': <span class="text-muted-foreground">$1</span>');
 }
+
+const RESPONSE_TABS = [
+  { id: "body", label: "Response" },
+  { id: "headers", label: "Headers" },
+  { id: "cookies", label: "Cookies" },
+  { id: "timeline", label: "Timeline" },
+  { id: "preview", label: "Preview" },
+];
 
 const ResponseViewer = memo(({ response, loading }) => {
   const [activeTab, setActiveTab] = useState("body");
+  const [copied, setCopied] = useState(false);
+  const [beautified, setBeautified] = useState(true);
+  const [expanded, setExpanded] = useState(false);
+
+  const handleCopy = useCallback(async () => {
+    if (!response?.body) return;
+    const text = typeof response.body === "string"
+      ? response.body
+      : JSON.stringify(response.body, null, 2);
+    await navigator.clipboard.writeText(text);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  }, [response]);
+
+  const handleDownload = useCallback(() => {
+    if (!response?.body) return;
+    const text = typeof response.body === "string"
+      ? response.body
+      : JSON.stringify(response.body, null, 2);
+    const blob = new Blob([text], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "response.json";
+    a.click();
+    URL.revokeObjectURL(url);
+  }, [response]);
+
+  const formatBody = () => {
+    if (!response?.body) return "";
+    if (beautified && typeof response.body === "object") {
+      return JSON.stringify(response.body, null, 2);
+    }
+    return typeof response.body === "string"
+      ? response.body
+      : JSON.stringify(response.body);
+  };
 
   if (loading) {
     return (
-      <div className="flex min-h-[200px] flex-col items-center justify-center rounded-xl border border-[#E8E6E1] bg-white p-8 shadow-sm dark:border-[#2a2a28] dark:bg-[#1c1c1a] md:min-h-[300px]">
-        <div className="mb-4 h-8 w-8 animate-spin rounded-full border-2 border-[#E8E6E1] border-t-[#D97757] dark:border-[#2a2a28] dark:border-t-[#e88b6a]"></div>
-        <p className="text-sm font-medium text-[#6b6b6b] dark:text-[#9a9a9a]">
+      <motion.div
+        initial={{ opacity: 0, y: 8 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="flex min-h-[160px] flex-col items-center justify-center rounded-xl border border-border bg-card p-8 shadow-sm md:min-h-[200px]"
+      >
+        <div className="mb-3 h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+        <p className="text-xs font-medium text-muted-foreground">
           Fetching response...
         </p>
-      </div>
+      </motion.div>
     );
   }
 
   if (!response) {
     return (
-      <div className="flex min-h-[200px] flex-col items-center justify-center rounded-xl border border-[#E8E6E1] bg-white p-8 text-[#9a9a9a] shadow-sm dark:border-[#2a2a28] dark:bg-[#1c1c1a] dark:text-[#6b6b6b] md:min-h-[300px]">
-        <svg
-          xmlns="http://www.w3.org/2000/svg"
-          className="mb-4 h-8 w-8 opacity-20 md:h-12 md:w-12"
-          fill="none"
-          viewBox="0 0 24 24"
-          stroke="currentColor"
-        >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth={1}
-            d="M13 10V3L4 14h7v7l9-11h-7z"
-          />
-        </svg>
-        <p className="text-sm">Send a request to see the response here</p>
-      </div>
+      <motion.div
+        initial={{ opacity: 0, y: 8 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="flex min-h-[160px] flex-col items-center justify-center rounded-xl border border-border bg-card p-8 shadow-sm md:min-h-[200px]"
+      >
+        <Sparkles className="mb-3 h-6 w-6 text-muted-foreground/30" />
+        <p className="text-xs text-muted-foreground">
+          Send a request to see the response here
+        </p>
+      </motion.div>
     );
   }
 
   if (response.error) {
     return (
-      <div className="rounded-xl border border-[#FEE2E2] bg-[#FEF2F2] p-6 shadow-sm dark:border-[#3a1a1a] dark:bg-[#1a0a0a]">
-        <h3 className="mb-2 font-semibold text-[#C62828] dark:text-[#ff6f6f]">Request Failed</h3>
-        <pre className="overflow-auto text-xs whitespace-pre-wrap text-[#DC2626] dark:text-[#ff6f6f]">
+      <motion.div
+        initial={{ opacity: 0, y: 8 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="rounded-xl border border-destructive/20 bg-destructive/5 p-5 shadow-sm"
+      >
+        <h3 className="mb-2 text-xs font-semibold text-destructive">Request Failed</h3>
+        <pre className="overflow-auto text-xs whitespace-pre-wrap text-destructive/80 font-mono">
           {response.error}
         </pre>
-      </div>
+      </motion.div>
     );
   }
 
-  const { status, statusText, responseTime, headers, body } = response;
+  const { status, statusText, responseTime, headers, body, size } = response;
   const isError = status >= 400;
+  const isSuccess = status >= 200 && status < 300;
+  const statusColor = isError
+    ? "bg-destructive/10 text-destructive border-destructive/20"
+    : isSuccess
+      ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20"
+      : "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20";
+
+  const bodySize = size || (body ? new Blob([typeof body === "string" ? body : JSON.stringify(body)]).size : 0);
+  const formattedSize = bodySize > 1024
+    ? `${(bodySize / 1024).toFixed(1)} KB`
+    : `${bodySize} B`;
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border border-[#E8E6E1] bg-white shadow-sm dark:border-[#2a2a28] dark:bg-[#1c1c1a]">
-      <div className="flex flex-wrap items-center gap-3 border-b border-[#E8E6E1] bg-[#FDFCF8] px-4 py-3 dark:border-[#2a2a28] dark:bg-[#111110] md:px-6 md:py-4">
-        <span className="text-xs font-medium text-[#6b6b6b] dark:text-[#9a9a9a]">Response</span>
-        <div className="flex flex-wrap items-center gap-2">
-          <span
-            className={`rounded-full px-2.5 py-1 text-[10px] font-semibold md:px-3 md:py-1.5 md:text-xs ${isError ? "border border-[#FEE2E2] bg-[#FEF2F2] text-[#C62828] dark:border-[#3a1a1a] dark:bg-[#1a0a0a] dark:text-[#ff6f6f]" : "border border-[#DCFCE7] bg-[#F0FDF4] text-[#16A34A] dark:border-[#1a3a1a] dark:bg-[#0a1a0a] dark:text-[#6fbf6f]"}`}
+    <motion.div
+      initial={{ opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
+      className={cn(
+        "flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border border-border bg-card shadow-sm",
+        expanded && "fixed inset-4 z-50"
+      )}
+    >
+      <div className="flex items-center justify-between border-b border-border bg-muted/20 px-4 py-2.5">
+        <div className="flex items-center gap-3">
+          <span className="text-[11px] font-medium text-muted-foreground">Response</span>
+          <div className="flex items-center gap-2">
+            <span className={cn(
+              "inline-flex items-center rounded-md border px-2 py-0.5 text-[11px] font-semibold",
+              statusColor
+            )}>
+              {status}{statusText ? ` ${statusText}` : ""}
+            </span>
+            <span className="rounded-md bg-muted px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
+              {responseTime}ms
+            </span>
+            <span className="rounded-md bg-muted px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
+              {formattedSize}
+            </span>
+          </div>
+        </div>
+        <div className="flex items-center gap-1">
+          <button
+            onClick={handleCopy}
+            className="flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground/60 transition-colors hover:bg-accent hover:text-accent-foreground"
+            title="Copy response"
           >
-            {status} {statusText}
-          </span>
-          <span className="rounded bg-[#F5F3F0] px-2 py-0.5 text-[10px] font-medium text-[#6b6b6b] dark:bg-[#111110] dark:text-[#9a9a9a] md:px-2.5 md:py-1 md:text-xs">
-            {responseTime}ms
-          </span>
+            {copied ? <Check className="h-3.5 w-3.5 text-emerald-500" /> : <Copy className="h-3.5 w-3.5" />}
+          </button>
+          <button
+            onClick={handleDownload}
+            className="flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground/60 transition-colors hover:bg-accent hover:text-accent-foreground"
+            title="Download response"
+          >
+            <Download className="h-3.5 w-3.5" />
+          </button>
+          <button
+            onClick={() => setBeautified(!beautified)}
+            className={cn(
+              "flex h-7 w-7 items-center justify-center rounded-md transition-colors",
+              beautified
+                ? "bg-primary/10 text-primary"
+                : "text-muted-foreground/60 hover:bg-accent hover:text-accent-foreground"
+            )}
+            title="Beautify JSON"
+          >
+            <Sparkles className="h-3.5 w-3.5" />
+          </button>
+          <button
+            onClick={() => setExpanded(!expanded)}
+            className="flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground/60 transition-colors hover:bg-accent hover:text-accent-foreground"
+            title="Toggle fullscreen"
+          >
+            {expanded ? <Minimize2 className="h-3.5 w-3.5" /> : <Maximize2 className="h-3.5 w-3.5" />}
+          </button>
         </div>
       </div>
 
-      <div className="flex border-b border-[#E8E6E1] bg-[#F5F3F0] px-6 dark:border-[#2a2a28] dark:bg-[#111110]">
-        <button
-          onClick={() => setActiveTab("body")}
-          className={`border-b-2 px-4 py-3 text-xs font-medium transition-all ${activeTab === "body" ? "border-[#D97757] text-[#D97757] dark:border-[#e88b6a] dark:text-[#e88b6a]" : "border-transparent text-[#6b6b6b] hover:text-[#1a1a1a] dark:text-[#9a9a9a] dark:hover:text-[#e8e6e1]"}`}
-        >
-          Body
-        </button>
-        <button
-          onClick={() => setActiveTab("headers")}
-          className={`border-b-2 px-4 py-3 text-xs font-medium transition-all ${activeTab === "headers" ? "border-[#D97757] text-[#D97757] dark:border-[#e88b6a] dark:text-[#e88b6a]" : "border-transparent text-[#6b6b6b] hover:text-[#1a1a1a] dark:text-[#9a9a9a] dark:hover:text-[#e8e6e1]"}`}
-        >
-          Headers
-        </button>
+      <div className="flex items-center gap-0 border-b border-border bg-muted/10 px-3 overflow-x-auto">
+        {RESPONSE_TABS.map((tab) => (
+          <button
+            key={tab.id}
+            onClick={() => setActiveTab(tab.id)}
+            className={cn(
+              "relative px-3 py-2 text-[11px] font-medium transition-colors whitespace-nowrap",
+              activeTab === tab.id
+                ? "text-foreground"
+                : "text-muted-foreground hover:text-foreground"
+            )}
+          >
+            {tab.label}
+            {activeTab === tab.id && (
+              <motion.div
+                layoutId="resp-tab-indicator"
+                className="absolute bottom-0 left-2 right-2 h-0.5 rounded-full bg-primary"
+                transition={{ type: "spring", stiffness: 400, damping: 30 }}
+              />
+            )}
+          </button>
+        ))}
       </div>
 
-      <div className="min-h-0 flex-1 overflow-auto bg-[#FDFCF8] dark:bg-[#111110]">
-        {activeTab === "body" ? (
-          <pre
-            className="h-full overflow-auto p-4 font-mono text-sm leading-relaxed whitespace-pre-wrap md:p-6"
-            dangerouslySetInnerHTML={{ __html: highlightJSON(body) }}
-          />
-        ) : (
-          <div className="h-full space-y-2 overflow-auto bg-[#FDFCF8] p-4 dark:bg-[#111110] md:p-6">
-            {Object.entries(headers).map(([key, value]) => (
-              <div
-                key={key}
-                className="flex flex-col gap-1 rounded border-b border-[#E8E6E1] p-2 transition-colors last:border-0 hover:bg-[#F5F3F0] dark:border-[#2a2a28] dark:hover:bg-[#1c1c1a] md:flex-row"
-              >
-                <span className="truncate text-xs font-medium text-[#1a1a1a] dark:text-[#e8e6e1] md:w-1/3">
-                  {key}
-                </span>
-                <span className="flex-1 font-mono text-xs break-all text-[#6b6b6b] dark:text-[#9a9a9a]">
-                  {value}
-                </span>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-    </div>
+      <AnimatePresence mode="wait">
+        <motion.div
+          key={activeTab}
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 0.1 }}
+          className="min-h-0 flex-1 overflow-auto"
+        >
+          {activeTab === "body" && (
+            <div className="relative h-full">
+              <pre
+                className="h-full overflow-auto p-4 font-mono text-xs leading-relaxed whitespace-pre-wrap md:p-5"
+                style={{ tabSize: 2 }}
+                dangerouslySetInnerHTML={{ __html: highlightJSON(beautified ? body : formatBody()) }}
+              />
+            </div>
+          )}
+
+          {activeTab === "headers" && (
+            <div className="space-y-0.5 p-4">
+              {headers && Object.entries(headers).length > 0 ? (
+                Object.entries(headers).map(([key, value]) => (
+                  <div
+                    key={key}
+                    className="flex flex-col gap-0.5 rounded-lg border border-border/50 px-3 py-2 transition-colors hover:bg-muted/30 md:flex-row md:items-center"
+                  >
+                    <span className="text-xs font-medium text-foreground md:w-1/3">
+                      {key}
+                    </span>
+                    <span className="flex-1 font-mono text-[11px] break-all text-muted-foreground">
+                      {value}
+                    </span>
+                  </div>
+                ))
+              ) : (
+                <div className="flex items-center justify-center py-12">
+                  <p className="text-xs text-muted-foreground">No response headers</p>
+                </div>
+              )}
+            </div>
+          )}
+
+          {(activeTab === "cookies" || activeTab === "timeline" || activeTab === "preview") && (
+            <div className="flex items-center justify-center py-12">
+              <p className="text-xs text-muted-foreground capitalize">{activeTab} view coming soon</p>
+            </div>
+          )}
+        </motion.div>
+      </AnimatePresence>
+    </motion.div>
   );
 });
 

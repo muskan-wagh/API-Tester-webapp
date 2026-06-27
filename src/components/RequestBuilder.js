@@ -1,5 +1,48 @@
 "use client";
-import { useState, useEffect, memo } from "react";
+import { useState, useEffect, memo, useRef } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import {
+  Send,
+  Plus,
+  X,
+  ChevronDown,
+  Code,
+  FileText,
+  Braces,
+  Sigma,
+  Binary,
+  FileCode,
+} from "lucide-react";
+import { cn } from "@/lib/utils";
+
+const METHODS = ["GET", "POST", "PUT", "PATCH", "DELETE"];
+
+const methodColors = {
+  GET: { bg: "bg-emerald-500", text: "text-emerald-600 dark:text-emerald-400", badge: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400" },
+  POST: { bg: "bg-blue-500", text: "text-blue-600 dark:text-blue-400", badge: "bg-blue-500/10 text-blue-600 dark:text-blue-400" },
+  PUT: { bg: "bg-amber-500", text: "text-amber-600 dark:text-amber-400", badge: "bg-amber-500/10 text-amber-600 dark:text-amber-400" },
+  PATCH: { bg: "bg-purple-500", text: "text-purple-600 dark:text-purple-400", badge: "bg-purple-500/10 text-purple-600 dark:text-purple-400" },
+  DELETE: { bg: "bg-red-500", text: "text-red-600 dark:text-red-400", badge: "bg-red-500/10 text-red-600 dark:text-red-400" },
+};
+
+const bodyTypes = [
+  { id: "json", label: "JSON", icon: Braces },
+  { id: "form-data", label: "Form Data", icon: FileText },
+  { id: "raw", label: "Raw", icon: Code },
+  { id: "binary", label: "Binary", icon: Binary },
+  { id: "text", label: "Text", icon: Sigma },
+  { id: "xml", label: "XML", icon: FileCode },
+];
+
+const TABS = [
+  { id: "headers", label: "Headers" },
+  { id: "params", label: "Params" },
+  { id: "authorization", label: "Authorization" },
+  { id: "body", label: "Body" },
+  { id: "cookies", label: "Cookies" },
+  { id: "tests", label: "Tests" },
+  { id: "settings", label: "Settings" },
+];
 
 const RequestBuilder = memo(({ onSend, loading, initialData, collections }) => {
   const [method, setMethod] = useState("GET");
@@ -7,7 +50,15 @@ const RequestBuilder = memo(({ onSend, loading, initialData, collections }) => {
   const [activeTab, setActiveTab] = useState("headers");
   const [headers, setHeaders] = useState([{ key: "", value: "" }]);
   const [body, setBody] = useState("");
+  const [bodyType, setBodyType] = useState("json");
   const [collectionId, setCollectionId] = useState("");
+  const [methodOpen, setMethodOpen] = useState(false);
+  const urlRef = useRef(null);
+
+  useEffect(() => {
+    const saved = localStorage.getItem("lastUrl");
+    if (saved) setUrl(saved);
+  }, []);
 
   useEffect(() => {
     if (initialData) {
@@ -37,6 +88,16 @@ const RequestBuilder = memo(({ onSend, loading, initialData, collections }) => {
     }
   }, [initialData]);
 
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
+        if (url) handleSubmit(e);
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [url, method, headers, body, collectionId]);
+
   const handleAddHeader = () => {
     setHeaders([...headers, { key: "", value: "" }]);
   };
@@ -44,6 +105,9 @@ const RequestBuilder = memo(({ onSend, loading, initialData, collections }) => {
   const handleHeaderChange = (index, field, value) => {
     const newHeaders = [...headers];
     newHeaders[index][field] = value;
+    if (index === headers.length - 1 && value) {
+      newHeaders.push({ key: "", value: "" });
+    }
     setHeaders(newHeaders);
   };
 
@@ -53,7 +117,8 @@ const RequestBuilder = memo(({ onSend, loading, initialData, collections }) => {
   };
 
   const handleSubmit = (e) => {
-    e.preventDefault();
+    e?.preventDefault();
+    localStorage.setItem("lastUrl", url);
     const headerObj = {};
     headers.forEach((h) => {
       if (h.key.trim()) headerObj[h.key] = h.value;
@@ -61,9 +126,13 @@ const RequestBuilder = memo(({ onSend, loading, initialData, collections }) => {
 
     let parsedBody = null;
     if (method !== "GET" && method !== "HEAD" && body.trim()) {
-      try {
-        parsedBody = JSON.parse(body);
-      } catch (err) {
+      if (bodyType === "json") {
+        try {
+          parsedBody = JSON.parse(body);
+        } catch {
+          parsedBody = body;
+        }
+      } else {
         parsedBody = body;
       }
     }
@@ -77,162 +146,247 @@ const RequestBuilder = memo(({ onSend, loading, initialData, collections }) => {
     });
   };
 
+  const mc = methodColors[method] || methodColors.GET;
+
   return (
-    <div className="flex flex-col overflow-hidden rounded-xl border border-[#E8E6E1] bg-white shadow-sm dark:border-[#2a2a28] dark:bg-[#1c1c1a]">
-      <div className="flex items-center justify-between border-b border-[#E8E6E1] bg-[#FDFCF8] px-4 py-3 dark:border-[#2a2a28] dark:bg-[#111110] md:px-6 md:py-4">
-        <div className="flex items-center gap-3">
-          <span className="text-xs font-medium text-[#6b6b6b] dark:text-[#9a9a9a]">
-            Workspace /
-          </span>
-          <select
-            value={collectionId}
-            onChange={(e) => setCollectionId(e.target.value)}
-            className="rounded-md border border-[#E8E6E1] bg-[#F5F3F0] px-3 py-1.5 text-xs font-medium text-[#1a1a1a] transition-all outline-none focus:border-[#D97757] focus:ring-1 focus:ring-[#D97757] dark:border-[#2a2a28] dark:bg-[#111110] dark:text-[#e8e6e1] dark:focus:border-[#e88b6a] dark:focus:ring-[#e88b6a]"
-          >
-            <option key="none" value="">No Collection</option>
-            {collections?.map((c) => (
-              <option key={c._id} value={c._id}>
-                {c.name}
-              </option>
-            ))}
-          </select>
+    <div className="flex flex-col overflow-hidden rounded-xl border border-border bg-card shadow-sm">
+      <div className="flex items-center justify-between border-b border-border bg-muted/30 px-3 py-2 md:px-4">
+        <div className="flex items-center gap-2">
+          <span className="text-[11px] font-medium text-muted-foreground">Workspace</span>
+          {collections.length > 0 && (
+            <>
+              <span className="text-muted-foreground/40">/</span>
+              <select
+                value={collectionId}
+                onChange={(e) => setCollectionId(e.target.value)}
+                className="rounded-md border-0 bg-transparent px-1.5 py-0.5 text-[11px] font-medium text-foreground outline-none focus:ring-0"
+              >
+                <option value="">No Collection</option>
+                {collections.map((c) => (
+                  <option key={c._id} value={c._id}>{c.name}</option>
+                ))}
+              </select>
+            </>
+          )}
         </div>
       </div>
-      <form
-        onSubmit={handleSubmit}
-        className="flex flex-col gap-3 border-b border-[#E8E6E1] bg-white p-4 dark:border-[#2a2a28] dark:bg-[#1c1c1a] md:flex-row md:p-6"
-      >
-        <div className="flex gap-3">
-          <select
-            value={method}
-            onChange={(e) => setMethod(e.target.value)}
-            className="rounded-lg border border-[#E8E6E1] bg-[#F5F3F0] px-4 py-2.5 text-sm font-semibold text-[#1a1a1a] transition-all outline-none focus:border-[#D97757] focus:ring-1 focus:ring-[#D97757] dark:border-[#2a2a28] dark:bg-[#111110] dark:text-[#e8e6e1] dark:focus:border-[#e88b6a] dark:focus:ring-[#e88b6a]"
-          >
-            <option value="GET">GET</option>
-            <option value="POST">POST</option>
-            <option value="PUT">PUT</option>
-            <option value="PATCH">PATCH</option>
-            <option value="DELETE">DELETE</option>
-          </select>
+
+      <form onSubmit={handleSubmit} className="flex flex-col gap-0">
+        <div className="flex items-center gap-2 border-b border-border px-3 py-3 md:px-4">
+          <div className="relative">
+            <button
+              type="button"
+              onClick={() => setMethodOpen(!methodOpen)}
+              className={cn(
+                "flex h-9 items-center gap-1.5 rounded-lg px-3 text-xs font-bold tracking-wide uppercase transition-all",
+                mc.badge
+              )}
+            >
+              {method}
+              <ChevronDown className="h-3 w-3 opacity-60" />
+            </button>
+            {methodOpen && (
+              <>
+                <div className="fixed inset-0 z-10" onClick={() => setMethodOpen(false)} />
+                <div className="absolute left-0 top-full z-20 mt-1 w-24 overflow-hidden rounded-lg border border-border bg-popover py-1 shadow-lg">
+                  {METHODS.map((m) => (
+                    <button
+                      key={m}
+                      type="button"
+                      onClick={() => { setMethod(m); setMethodOpen(false); }}
+                      className={cn(
+                        "flex w-full items-center px-3 py-1.5 text-xs font-bold tracking-wide transition-colors hover:bg-accent",
+                        methodColors[m]?.text
+                      )}
+                    >
+                      {m}
+                    </button>
+                  ))}
+                </div>
+              </>
+            )}
+          </div>
+
+          <div className="relative flex-1">
+            <input
+              ref={urlRef}
+              type="url"
+              placeholder="https://api.example.com/users"
+              className="h-9 w-full rounded-lg border border-input bg-background px-3 pr-20 text-sm text-foreground outline-none transition-all placeholder:text-muted-foreground/50 focus:border-ring focus:ring-2 focus:ring-ring/20"
+              value={url}
+              onChange={(e) => setUrl(e.target.value)}
+              required
+            />
+            <div className="absolute right-1 top-1/2 hidden -translate-y-1/2 items-center gap-1 md:flex">
+              <span className="text-[10px] text-muted-foreground/40">Ctrl+Enter</span>
+            </div>
+          </div>
+
           <button
             type="submit"
             disabled={loading || !url}
-            className="flex-1 rounded-lg bg-[#D97757] px-6 py-2.5 text-sm font-semibold text-white transition-all hover:bg-[#C46745] disabled:cursor-not-allowed disabled:opacity-50 dark:bg-[#e88b6a] dark:hover:bg-[#d97757] md:hidden"
+            className="flex h-9 items-center gap-1.5 rounded-lg bg-primary px-4 text-sm font-semibold text-primary-foreground shadow-sm transition-all hover:bg-primary/90 active:scale-[0.97] disabled:cursor-not-allowed disabled:opacity-50"
           >
-            {loading ? "Sending..." : "Send"}
-          </button>
-        </div>
-        <div className="flex flex-1 gap-3">
-          <input
-            type="url"
-            placeholder="Enter request URL..."
-            className="min-w-0 flex-1 rounded-lg border border-[#E8E6E1] bg-[#FDFCF8] px-4 py-2.5 text-sm text-[#1a1a1a] transition-all outline-none focus:border-[#D97757] focus:ring-1 focus:ring-[#D97757] dark:border-[#2a2a28] dark:bg-[#111110] dark:text-[#e8e6e1] dark:placeholder:text-[#6b6b6b] dark:focus:border-[#e88b6a] dark:focus:ring-[#e88b6a]"
-            value={url}
-            onChange={(e) => setUrl(e.target.value)}
-            required
-          />
-          <button
-            type="submit"
-            disabled={loading || !url}
-            className="hidden rounded-lg bg-[#D97757] px-6 py-2.5 text-sm font-semibold text-white transition-all hover:bg-[#C46745] disabled:cursor-not-allowed disabled:opacity-50 dark:bg-[#e88b6a] dark:hover:bg-[#d97757] md:block"
-          >
-            {loading ? "Sending..." : "Send"}
+            {loading ? (
+              <div className="h-4 w-4 animate-spin rounded-full border-2 border-primary-foreground border-t-transparent" />
+            ) : (
+              <Send className="h-4 w-4" />
+            )}
+            <span className="hidden md:inline">{loading ? "Sending..." : "Send"}</span>
           </button>
         </div>
       </form>
 
-      <div className="flex border-b border-[#E8E6E1] bg-[#F5F3F0] px-6 dark:border-[#2a2a28] dark:bg-[#111110]">
-        <button
-          type="button"
-          onClick={() => setActiveTab("headers")}
-          className={`border-b-2 px-4 py-3 text-xs font-medium transition-all ${activeTab === "headers" ? "border-[#D97757] text-[#D97757] dark:border-[#e88b6a] dark:text-[#e88b6a]" : "border-transparent text-[#6b6b6b] hover:text-[#1a1a1a] dark:text-[#9a9a9a] dark:hover:text-[#e8e6e1]"}`}
-        >
-          Headers
-        </button>
-        <button
-          type="button"
-          disabled={method === "GET" || method === "HEAD"}
-          onClick={() => setActiveTab("body")}
-          className={`border-b-2 px-4 py-3 text-xs font-medium transition-all ${activeTab === "body" ? "border-[#D97757] text-[#D97757] dark:border-[#e88b6a] dark:text-[#e88b6a]" : "border-transparent text-[#6b6b6b] hover:text-[#1a1a1a] dark:text-[#9a9a9a] dark:hover:text-[#e8e6e1] disabled:opacity-30"}`}
-        >
-          Body
-        </button>
+      <div className="flex items-center gap-0 border-b border-border bg-muted/20 px-3 overflow-x-auto">
+        {TABS.map((tab) => (
+          <button
+            key={tab.id}
+            type="button"
+            onClick={() => setActiveTab(tab.id)}
+            className={cn(
+              "relative px-3 py-2.5 text-[11px] font-medium transition-colors whitespace-nowrap",
+              activeTab === tab.id
+                ? "text-foreground"
+                : "text-muted-foreground hover:text-foreground"
+            )}
+          >
+            {tab.label}
+            {activeTab === tab.id && (
+              <motion.div
+                layoutId="tab-indicator"
+                className="absolute bottom-0 left-2 right-2 h-0.5 rounded-full bg-primary"
+                transition={{ type: "spring", stiffness: 400, damping: 30 }}
+              />
+            )}
+          </button>
+        ))}
       </div>
 
-      <div className="max-h-[350px] min-h-[160px] overflow-auto bg-[#FDFCF8] p-4 dark:bg-[#111110] md:p-6">
-        {activeTab === "headers" ? (
-          <div className="space-y-2">
-            {headers.map((header, index) => (
-              <div key={index} className="flex flex-col gap-2 md:flex-row">
-                <input
-                  className="flex-1 rounded-md border border-[#E8E6E1] bg-white px-3 py-2 text-sm text-[#1a1a1a] transition-all outline-none focus:border-[#D97757] focus:ring-1 focus:ring-[#D97757] dark:border-[#2a2a28] dark:bg-[#1c1c1a] dark:text-[#e8e6e1] dark:placeholder:text-[#6b6b6b] dark:focus:border-[#e88b6a] dark:focus:ring-[#e88b6a]"
-                  placeholder="Key"
-                  value={header.key}
-                  onChange={(e) =>
-                    handleHeaderChange(index, "key", e.target.value)
-                  }
-                />
-                <input
-                  className="flex-1 rounded-md border border-[#E8E6E1] bg-white px-3 py-2 text-sm text-[#1a1a1a] transition-all outline-none focus:border-[#D97757] focus:ring-1 focus:ring-[#D97757] dark:border-[#2a2a28] dark:bg-[#1c1c1a] dark:text-[#e8e6e1] dark:placeholder:text-[#6b6b6b] dark:focus:border-[#e88b6a] dark:focus:ring-[#e88b6a]"
-                  placeholder="Value"
-                  value={header.value}
-                  onChange={(e) =>
-                    handleHeaderChange(index, "value", e.target.value)
-                  }
-                />
+      <AnimatePresence mode="wait">
+        <motion.div
+          key={activeTab}
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 0.12 }}
+          className="bg-background"
+        >
+          {activeTab === "headers" && (
+            <div className="max-h-[320px] min-h-[120px] overflow-auto p-4">
+              <div className="flex flex-col gap-0">
+                <div className="hidden grid-cols-[1fr_1fr_32px] gap-2 px-0.5 pb-1.5 md:grid">
+                  <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">Key</span>
+                  <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">Value</span>
+                </div>
+                {headers.map((header, index) => (
+                  <div
+                    key={index}
+                    className="group -mx-1 flex flex-col gap-1.5 rounded-lg px-1 py-1 transition-colors hover:bg-muted/30 md:flex-row md:items-center"
+                  >
+                    <input
+                      className="h-8 flex-1 rounded-md border border-input bg-card px-2.5 text-xs text-foreground outline-none transition-colors placeholder:text-muted-foreground/50 focus:border-ring focus:ring-1 focus:ring-ring/20"
+                      placeholder="Key"
+                      value={header.key}
+                      onChange={(e) => handleHeaderChange(index, "key", e.target.value)}
+                    />
+                    <input
+                      className="h-8 flex-1 rounded-md border border-input bg-card px-2.5 text-xs text-foreground outline-none transition-colors placeholder:text-muted-foreground/50 focus:border-ring focus:ring-1 focus:ring-ring/20"
+                      placeholder="Value"
+                      value={header.value}
+                      onChange={(e) => handleHeaderChange(index, "value", e.target.value)}
+                    />
+                    {headers.length > 1 && (
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveHeader(index)}
+                        className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-muted-foreground/40 transition-colors hover:bg-destructive/10 hover:text-destructive"
+                      >
+                        <X className="h-3.5 w-3.5" />
+                      </button>
+                    )}
+                  </div>
+                ))}
                 <button
                   type="button"
-                  onClick={() => handleRemoveHeader(index)}
-                  className="px-2 text-[#9a9a9a] transition-colors hover:text-[#C62828] dark:text-[#6b6b6b] dark:hover:text-[#ff6f6f]"
+                  onClick={handleAddHeader}
+                  className="mt-2 flex items-center gap-1.5 text-xs font-medium text-primary transition-colors hover:text-primary/80"
                 >
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    className="h-4 w-4"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M6 18L18 6M6 6l12 12"
-                    />
-                  </svg>
+                  <Plus className="h-3.5 w-3.5" />
+                  Add header
                 </button>
               </div>
-            ))}
-            <button
-              type="button"
-              onClick={handleAddHeader}
-              className="mt-3 flex items-center gap-1.5 text-xs font-medium text-[#D97757] hover:underline dark:text-[#e88b6a]"
-            >
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                className="h-3.5 w-3.5"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M12 4v16m8-8H4"
-                />
-              </svg>
-              Add header
-            </button>
-          </div>
-        ) : (
-          <textarea
-            className="h-[180px] w-full resize-none rounded-lg border border-[#E8E6E1] bg-white p-4 font-mono text-sm text-[#1a1a1a] transition-all outline-none focus:border-[#D97757] focus:ring-1 focus:ring-[#D97757] dark:border-[#2a2a28] dark:bg-[#1c1c1a] dark:text-[#e8e6e1] dark:placeholder:text-[#6b6b6b] dark:focus:border-[#e88b6a] dark:focus:ring-[#e88b6a]"
-            placeholder='{ "key": "value" }'
-            value={body}
-            onChange={(e) => setBody(e.target.value)}
-          />
-        )}
-      </div>
+            </div>
+          )}
+
+          {activeTab === "params" && (
+            <div className="flex h-[120px] items-center justify-center">
+              <p className="text-xs text-muted-foreground">Query parameters coming soon</p>
+            </div>
+          )}
+
+          {activeTab === "authorization" && (
+            <div className="flex h-[120px] items-center justify-center">
+              <p className="text-xs text-muted-foreground">Authorization coming soon</p>
+            </div>
+          )}
+
+          {activeTab === "body" && (
+            <div className="flex flex-col">
+              <div className="flex items-center gap-1 border-b border-border px-3 py-1.5 overflow-x-auto">
+                {bodyTypes.map((bt) => {
+                  const Icon = bt.icon;
+                  return (
+                    <button
+                      key={bt.id}
+                      type="button"
+                      onClick={() => setBodyType(bt.id)}
+                      className={cn(
+                        "flex items-center gap-1.5 rounded-md px-2.5 py-1 text-[11px] font-medium transition-colors",
+                        bodyType === bt.id
+                          ? "bg-primary/10 text-primary"
+                          : "text-muted-foreground hover:text-foreground"
+                      )}
+                    >
+                      <Icon className="h-3 w-3" />
+                      {bt.label}
+                    </button>
+                  );
+                })}
+              </div>
+              <div className="max-h-[400px] min-h-[160px] overflow-auto">
+                {bodyType === "json" ? (
+                  <div className="relative">
+                    <textarea
+                      className="h-[200px] w-full resize-none border-0 bg-background p-4 font-mono text-xs leading-relaxed text-foreground outline-none placeholder:text-muted-foreground/40"
+                      placeholder='{\n  "key": "value"\n}'
+                      value={body}
+                      onChange={(e) => setBody(e.target.value)}
+                      spellCheck={false}
+                    />
+                    <div className="absolute bottom-3 right-3 rounded bg-muted/50 px-2 py-0.5 text-[10px] text-muted-foreground/60">
+                      JSON
+                    </div>
+                  </div>
+                ) : (
+                  <textarea
+                    className="h-[200px] w-full resize-none border-0 bg-background p-4 font-mono text-xs text-foreground outline-none placeholder:text-muted-foreground/40"
+                    placeholder="Enter body content..."
+                    value={body}
+                    onChange={(e) => setBody(e.target.value)}
+                    spellCheck={false}
+                  />
+                )}
+              </div>
+            </div>
+          )}
+
+          {(activeTab === "cookies" || activeTab === "tests" || activeTab === "settings") && (
+            <div className="flex h-[120px] items-center justify-center">
+              <p className="text-xs text-muted-foreground capitalize">{activeTab} coming soon</p>
+            </div>
+          )}
+        </motion.div>
+      </AnimatePresence>
     </div>
   );
 });
