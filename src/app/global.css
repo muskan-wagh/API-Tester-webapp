@@ -1,5 +1,7 @@
 @import "tailwindcss";
 
+@custom-variant dark (&:where(.dark, .dark *));
+
 :root {
   --bg-warm: #fdfcf8;
   --bg-card: #f5f3f0;
@@ -8,7 +10,20 @@
   --text-main: #1a1a1a;
   --text-muted: #6b6b6b;
   --text-light: #9a9a9a;
+  --text-lightest: #c0c0c0;
   --border-subtle: #e8e6e1;
+}
+
+.dark {
+  --bg-warm: #111110;
+  --bg-card: #1c1c1a;
+  --accent: #e88b6a;
+  --accent-hover: #d97757;
+  --text-main: #e8e6e1;
+  --text-muted: #9a9a9a;
+  --text-light: #6b6b6b;
+  --text-lightest: #555555;
+  --border-subtle: #2a2a28;
 }
 
 * {
@@ -31,73 +46,6 @@ body {
     "Segoe UI",
     Roboto,
     sans-serif;
-}
-
-/* Input styles */
-input[type="text"],
-input[type="email"],
-input[type="password"],
-input[type="url"] {
-  background: var(--bg-warm);
-  border: 1px solid var(--border-subtle);
-  border-radius: 8px;
-  padding: 12px 16px;
-  font-size: 14px;
-  color: var(--text-main);
-  outline: none;
-  transition:
-    border-color 0.15s,
-    box-shadow 0.15s;
-}
-
-input[type="text"]::placeholder,
-input[type="email"]::placeholder,
-input[type="password"]::placeholder,
-input[type="url"]::placeholder {
-  color: var(--text-light);
-}
-
-input[type="text"]:focus,
-input[type="email"]:focus,
-input[type="password"]:focus,
-input[type="url"]:focus {
-  border-color: var(--accent);
-  box-shadow: 0 0 0 2px rgba(217, 119, 87, 0.1);
-}
-
-textarea {
-  background: var(--bg-warm);
-  border: 1px solid var(--border-subtle);
-  border-radius: 8px;
-  padding: 12px 16px;
-  font-size: 14px;
-  color: var(--text-main);
-  outline: none;
-  transition:
-    border-color 0.15s,
-    box-shadow 0.15s;
-  resize: vertical;
-}
-
-textarea:focus {
-  border-color: var(--accent);
-  box-shadow: 0 0 0 2px rgba(217, 119, 87, 0.1);
-}
-
-select {
-  background: var(--bg-card);
-  border: 1px solid var(--border-subtle);
-  border-radius: 6px;
-  padding: 8px 12px;
-  font-size: 13px;
-  color: var(--text-main);
-  outline: none;
-  cursor: pointer;
-  transition: border-color 0.15s;
-}
-
-select:focus {
-  border-color: var(--accent);
 }
 
 button {
